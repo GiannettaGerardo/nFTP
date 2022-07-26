@@ -1,0 +1,22 @@
+Request (Version 1.0):
+    1. nFTP = string literal = 4 Byte
+    2. Version = 1 Byte:
+        2.1. major: 0001 = 4 bit
+        2.2. minor: 0000 = 4 bit
+    3. Istruction: number from 0 to 255 = 1 Byte
+    4. Paths:
+        4.1. total number of paths: number from 1 to 255 = 1 Byte
+        4.2. for each path:
+            4.2.1. Dimension: number from 1 to 65_535 = 2 Byte
+            4.2.2. Path: string literal = Dimension Byte
+    5. Payload - Optional:
+        5.1. Dimension: number from 1 to 4_294_967_295 = 4 Byte
+        5.2. Payload = Dimension Byte
+
+
+Examples (Bytes array representation):
+    1          2     3  4.1   4.2.1       4.2.2
+[..nFTP..][00010000][0] [1] [..0-4..][..file.txt..]
+
+    1          2     3  4.1   4.2.1       4.2.2         5.1         5.2
+[..nFTP..][00010000][1] [1] [..0-4..][..file.txt..][..0-0-0-5..][..hello..]
