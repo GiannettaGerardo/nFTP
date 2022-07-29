@@ -1,5 +1,8 @@
 mod server;
 
-fn main() {
-    println!("Hello, Server!");
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    println!("Hello, server!");
+
+    Ok(())
 }

@@ -19,8 +19,11 @@ pub fn process_request(input_bytes: Vec<u8>) -> Result<(), String> {
         return Err(e);
     }
     else {
-        let p = version.unwrap().parse(&input_bytes, &total_len, &mut acc_len, &mut index);
-        if let Err(e) = p {
+        let istruction = version.unwrap().parse(&input_bytes, &total_len, &mut acc_len, &mut index);
+        if let Err(e) = istruction {
+            return Err(e);
+        }
+        if let Err(e) = istruction.unwrap().execute() {
             return Err(e);
         }
     }

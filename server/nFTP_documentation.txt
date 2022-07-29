@@ -20,3 +20,19 @@ Examples (Bytes array representation):
 
     1          2     3  4.1   4.2.1       4.2.2         5.1         5.2
 [..nFTP..][00010000][1] [1] [..0-4..][..file.txt..][..0-0-0-5..][..hello..]
+
+-------------------------------------------------------------------------------
+
+Response (Version 1.0)
+    1. nFTP = string literal = 4 Byte
+    2. Version = 1 Byte:
+        2.1. major: 0001 = 4 bit
+        2.2. minor: 0000 = 4 bit
+    3. Response code: number from 0 to 255 = 1 Byte
+    4. Paths/Payloads - Optional
+        4.1. total number of paths/payloads: number from 1 to 255 = 1 Byte
+        4.2. for each path:
+            4.2.1. Dimension of path: number from 1 to 65_535 = 2 Byte
+            4.2.2. Path: string literal = (Dimension of path) Byte
+            4.2.3. Dimension of payload: number from 18_446_744_073_709_551_615 = u64 = 8 Byte
+            4.2.4. Payload = (Dimension of payload) Byte
