@@ -1,3 +1,6 @@
+use async_trait::async_trait;
+use tokio::net::TcpStream;
+
 /// Trait to represent all the versions of the nFTP protocol. 
 pub trait Version {
 
@@ -19,8 +22,9 @@ pub trait Version {
 
 
 /// Trait to represent all the istructions and their actions.
+#[async_trait]
 pub trait Istruction {
-    fn execute(&self) -> Result<(), String>;
+    async fn execute(&self, socket: &mut TcpStream, bytes: &Vec<u8>) -> Result<(), String>;
 
     fn get_istruction_code(&self) -> u8;
 }

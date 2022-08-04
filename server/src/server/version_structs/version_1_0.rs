@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, error::Error};
+
+use async_trait::async_trait;
+use tokio::{net::TcpStream, io::AsyncWriteExt};
 
 use crate::server::{version_trait::{Version, Istruction}, parser::{istruction_recognition, path_recognition}, MAIN_PATH, response::{ResponseHeader, RC_OK}};
 
@@ -32,6 +35,7 @@ impl Version for Version1_0 {
         };
     }
 
+    #[inline]
     fn get_version(&self) -> u8 {
         0b0001_0000u8
     }
@@ -42,29 +46,49 @@ impl Version for Version1_0 {
 pub struct Get {
     pub paths: Vec<PathBuf>
 }
+#[async_trait]
 impl Istruction for Get {
-    fn execute(&self) -> Result<(), String> {
-        let main_path = PathBuf::from(MAIN_PATH);
-        let mut new_vec = Vec::with_capacity(self.paths.len());
 
-        for path in &self.paths {
-            let complete_path = main_path.join(path);
-            if !complete_path.exists() {
-                return Err(String::from("A path doesn't exists"));
-            }
-            new_vec.push(complete_path);
+    /// For the GET request, execute() checks if the path exists and if it is a file,
+    /// then creates a response header, writes it and the file into the socket.
+    #[inline]
+    async fn execute(&self, socket: &mut TcpStream, bytes: &Vec<u8>) -> Result<(), String> {
+        let main_path = PathBuf::from(MAIN_PATH);
+
+        if self.paths.len() != 1 {
+            return Err(String::from("Too many paths for GET request"));
         }
 
-        let response_header = ResponseHeader::new(1, 0, RC_OK, Some(new_vec.len() as u16));
+        let complete_path = main_path.join(&self.paths[0]);
+        // first syscall - check the existence of the path and if the path is a file
+        if !complete_path.is_file() {
+            return Err(String::from("A path doesn't exists for GET request"));
+        }
+        
+        // second syscall - get the dimension of the file (in bytes)
+        let payload_dim = match complete_path.metadata() {
+            Ok(n) => n.len(),
+            Err(e) => return Err(e.to_string())
+        };
 
+        let response_header = ResponseHeader::new(1, 0, RC_OK, Some(payload_dim));
+
+        match socket.write(&response_header.transform()).await {
+            Ok(n) if n <= 0 => return Err(String::from("")),
+            // third syscall - read the file in bytes
+            Ok(_) => if let Err(e) = socket.write_all(&std::fs::read(complete_path).unwrap()).await {
+                return Err(e.to_string());
+            },
+            Err(_) => return Err(String::from(""))
+        };
         Ok(())
     }
 
+    #[inline]
     fn get_istruction_code(&self) -> u8 {
         0u8
     }
 }
-
 
 
 #[cfg(test)]

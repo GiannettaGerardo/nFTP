@@ -1,11 +1,29 @@
 use std::{str::from_utf8, path::PathBuf};
+use tokio::net::TcpStream;
 use super::{
     version_trait::Version, 
-    version_structs::version_1_0::Version1_0
+    version_structs::version_1_0::Version1_0,
+    read_bytes
 };
 
+/// Max number of accepted paths
+const MAX_PATHS: u8 = 10;
+/// Max dimension of the header buffer
+const MAX_HEADER_BUF: usize = 1024;
+
+
 /// Parse the input bytes according to nFTP protocol.
-pub fn process_request(input_bytes: Vec<u8>) -> Result<(), String> {
+#[inline]
+pub async fn process_request(socket: &mut TcpStream) -> Result<(), String> {
+    let mut input_bytes: Vec<u8> = vec![0; MAX_HEADER_BUF];
+    
+    let readed_bytes = read_bytes(socket, &mut input_bytes).await;
+    if let Err(e) = readed_bytes {
+        return Err(e);
+    }
+    let readed_bytes = readed_bytes.unwrap();
+    println!("readed bytes {}", readed_bytes); // log
+
     let total_len = input_bytes.len();
     let mut acc_len: usize = 4;
     let mut index: usize = 0;
@@ -18,17 +36,19 @@ pub fn process_request(input_bytes: Vec<u8>) -> Result<(), String> {
     if let Err(e) = version {
         return Err(e);
     }
-    else {
-        let istruction = version.unwrap().parse(&input_bytes, &total_len, &mut acc_len, &mut index);
-        if let Err(e) = istruction {
-            return Err(e);
-        }
-        if let Err(e) = istruction.unwrap().execute() {
-            return Err(e);
-        }
+
+    let istruction = version.unwrap().parse(&input_bytes, &total_len, &mut acc_len, &mut index);
+    if let Err(e) = istruction {
+        return Err(e);
     }
+
+    if let Err(e) = istruction.unwrap().execute(socket, &input_bytes).await {
+        return Err(e);
+    }
+
     Ok(())
 }
+
 
 /// Parse the input bytes and check the protocol name according to nFTP protocol.
 /// 
@@ -38,12 +58,13 @@ pub fn process_request(input_bytes: Vec<u8>) -> Result<(), String> {
 /// * `acc_len` - stands for "accumulator length". It serves as a temporary total length, for checks.
 /// * `index` - the index from which to start parsing the input bytes array.
 /// 
+#[inline]
 pub fn protocol_recognition(
     input_bytes: &Vec<u8>, 
     total_len: &usize, 
     acc_len: &mut usize, 
     index: &mut usize
-) -> Result<(), String>  
+) -> Result<(), String>
 {
     if (total_len <= acc_len) || 
         (from_utf8(&input_bytes[*index..*acc_len]).unwrap() != "nFTP") { 
@@ -63,6 +84,7 @@ pub fn protocol_recognition(
 /// * `acc_len` - stands for "accumulator length". It serves as a temporary total length, for checks.
 /// * `index` - the index from which to start parsing the input bytes array.
 /// 
+#[inline]
 pub fn version_recognition(
     input_bytes: &Vec<u8>, 
     total_len: &usize, 
@@ -94,6 +116,7 @@ pub fn version_recognition(
 /// * `acc_len` - stands for "accumulator length". It serves as a temporary total length, for checks.
 /// * `index` - the index from which to start parsing the input bytes array.
 /// 
+#[inline]
 pub fn istruction_recognition(
     input_bytes: &Vec<u8>, 
     total_len: &usize, 
@@ -118,6 +141,7 @@ pub fn istruction_recognition(
 /// * `acc_len` - stands for "accumulator length". It serves as a temporary total length, for checks.
 /// * `index` - the index from which to start parsing the input bytes array.
 /// 
+#[inline]
 pub fn path_recognition(
     input_bytes: &Vec<u8>, 
     total_len: &usize, 
@@ -130,6 +154,10 @@ pub fn path_recognition(
     if total_len <= acc_len { return Err(String::from("n_paths error")) }
     
     let n_paths = input_bytes[*index];
+    if n_paths < 1 && n_paths > MAX_PATHS {
+        return Err(String::from("error, n_paths is ") + &n_paths.to_string());
+    }
+
     let mut paths: Vec<PathBuf> = Vec::with_capacity(n_paths as usize);
 
     for _ in 0..n_paths {
@@ -140,6 +168,7 @@ pub fn path_recognition(
         let path_dimension: u16 = ((input_bytes[*index] as u16) << 8) | (input_bytes[*index + 1] as u16);
         *index = *acc_len;
         *acc_len += path_dimension as usize;
+
         if total_len < acc_len { return Err(String::from("path error")) }
 
         let p = from_utf8(&input_bytes[*index..*acc_len]);
