@@ -9,7 +9,7 @@ pub trait Version {
         input_bytes: &Vec<u8>,
         total_len: &usize, 
         acc_len: &mut usize, 
-        index: &mut usize) -> Result<Box<dyn Istruction>, String>;
+        index: &mut usize) -> Option<Box<dyn Istruction>>;
 
 
     /// Return the version according to the nFTP protocol.
@@ -24,7 +24,7 @@ pub trait Version {
 /// Trait to represent all the istructions and their actions.
 #[async_trait]
 pub trait Istruction {
-    async fn execute(&self, socket: &mut TcpStream, bytes: &Vec<u8>) -> Result<(), String>;
+    async fn execute(&self, socket: &mut TcpStream, bytes: &Vec<u8>) -> bool;
 
     fn get_istruction_code(&self) -> u8;
 }
