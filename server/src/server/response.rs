@@ -1,3 +1,6 @@
+use std::time::Duration;
+use tokio::{net::TcpStream, io::AsyncWriteExt, time::{Instant, sleep_until}};
+
 /// Response code OK
 pub const RC_OK: u8 = 1;
 
@@ -56,6 +59,45 @@ impl ResponseHeader {
     #[inline]
     pub fn get_header(&self) -> &Vec<u8> {
         &self.header_bytes
+    }
+}
+
+
+/// Try sending an error response. 
+/// In case of failure, try again using a procedure defined as follows:
+/// 
+/// 1. Wait 4 seconds and try again.
+/// 
+///    - In case of failure:
+/// 2. Wait 4 times the previous time and try again.
+/// 
+///    - In case of failure, go back to step 2.
+/// 
+/// 3. After 5 attempts (6 in total), you fail.
+/// 
+/// The growth of the waiting time is exponential, for 5 attempts 
+/// it will be (expressed in seconds):
+/// * 4 - 16 - 64 - 256 - 1024
+/// 
+/// # Arguments
+/// * `socket` - the socket to write to.
+/// * `error_response_code` - the error code to write.
+/// 
+#[inline]
+pub async fn send_error_response(socket: &mut TcpStream, error_response_code: u8) {
+    let response_header = ResponseHeader::new(1, 0, error_response_code, None);
+    let max_number_of_attempts: u8 = 5;
+    let mut milliseconds: u64 = 1000; // 1 sec
+
+    if socket.write_all(&response_header.get_header()).await.is_ok() {
+        return;
+    }
+    for _ in 0..max_number_of_attempts {
+        milliseconds *= 4;
+        sleep_until(Instant::now() + Duration::from_millis(milliseconds)).await;
+        if socket.write_all(&response_header.get_header()).await.is_ok() {
+            return;
+        }
     }
 }
 

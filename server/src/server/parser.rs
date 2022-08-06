@@ -14,26 +14,28 @@ const MAX_HEADER_BUF: usize = 1024;
 
 /// Parse the input bytes according to nFTP protocol.
 #[inline]
-pub async fn process_request(socket: &mut TcpStream) {
+pub async fn process_request(socket: &mut TcpStream) -> bool {
     let mut input_bytes: Vec<u8> = vec![0; MAX_HEADER_BUF];
     
     let readed_bytes = read_bytes(socket, &mut input_bytes).await;
-    let readed_bytes = if readed_bytes.is_none() { return } else { readed_bytes.unwrap() };
+    let readed_bytes = if readed_bytes.is_none() { return false } else { readed_bytes.unwrap() };
     println!("readed bytes {}", readed_bytes); // log
 
     let total_len = input_bytes.len();
     let mut acc_len: usize = 4;
     let mut index: usize = 0;
     
-    if !protocol_recognition(&input_bytes, &total_len, &mut acc_len, &mut index) { return }
+    if !protocol_recognition(&input_bytes, &total_len, &mut acc_len, &mut index) { return false }
 
     let version = version_recognition(&input_bytes, &total_len, &mut acc_len, &mut index);
-    let version = if version.is_none() { return } else { version.unwrap() };
+    let version = if version.is_none() { return false } else { version.unwrap() };
 
     let istruction = version.parse(&input_bytes, &total_len, &mut acc_len, &mut index);
-    let istruction = if istruction.is_none() { return } else { istruction.unwrap() };
+    let istruction = if istruction.is_none() { return false } else { istruction.unwrap() };
 
-    if !istruction.execute(socket, &input_bytes).await { return }
+    if !istruction.execute(socket, &input_bytes).await { return false }
+    
+    true
 }
 
 
@@ -181,7 +183,15 @@ pub fn path_recognition(
             println!("from_utf8 error");
             return None;
         }
-        paths.push(PathBuf::from(p.unwrap()));
+        
+        paths.push(PathBuf::from(
+            if p.unwrap().contains("..") {
+                println!("The path is not real absolute");
+                return None;
+            } else {
+                p.unwrap()
+            }
+        ));
     }
 
     Some(paths)
