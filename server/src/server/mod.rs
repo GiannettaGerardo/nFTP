@@ -27,7 +27,7 @@ async fn read_bytes(socket: &mut TcpStream, buf: &mut Vec<u8>) -> Option<usize> 
 }
 
 
-/// Light Weight Deserialization for the tree structure of filesystem.
+/// Light Weight Serialization for the tree structure of filesystem.
 /// The rules are:
 /// 1. for each directory, after the name use '{' and '}' to represent its contents;
 /// 2. for each file, after the name use ',' to represent that it's a file;
@@ -44,15 +44,15 @@ async fn read_bytes(socket: &mut TcpStream, buf: &mut Vec<u8>) -> Option<usize> 
 ///       |---> dir_4
 ///               |---> dir_5
 /// 
-/// deserialization:
+/// serialization:
 /// /{dir_1{file.txt,dir_2{file.txt,file.pdf}}dir_3{dir_4{dir_5{}}}}
 /// ```
 /// 
 /// # Arguments
-/// * `path` - the path from which to start the deserialization.
+/// * `path` - the path from which to start the serialization.
 /// * `result` - the mutable string that will contain the result.
 /// 
-pub fn tree_deserialization(path: &PathBuf, result: &mut String) {
+pub fn tree_serialization(path: &PathBuf, result: &mut String) {
     let dir = std::fs::read_dir(&path).expect("It is impossibile to read this Directory...");
 
     result.push_str(path.file_name().unwrap().to_str().unwrap());
@@ -68,7 +68,7 @@ pub fn tree_deserialization(path: &PathBuf, result: &mut String) {
             continue;
         }
         // is dir
-        tree_deserialization(&path.join(p.file_name()), result);
+        tree_serialization(&path.join(p.file_name()), result);
     }
 
     result.push('}');
@@ -79,15 +79,15 @@ pub fn tree_deserialization(path: &PathBuf, result: &mut String) {
 pub mod test {
     use std::path::PathBuf;
 
-    use super::tree_deserialization;
+    use super::tree_serialization;
 
     #[test]
-    fn tree_deserialization_each_opening_parenthesis_is_properly_closed() {
+    fn tree_serialization_each_opening_parenthesis_is_properly_closed() {
         let mut result = String::new();
-        let path = PathBuf::from("./tests/tree_deserialization/root");
+        let path = PathBuf::from("./tests/tree_serialization/root");
         let mut counter = 0;
 
-        tree_deserialization(&path, &mut result);
+        tree_serialization(&path, &mut result);
 
         for char in result.chars() {
             if char == '{' {
@@ -102,11 +102,11 @@ pub mod test {
     }
 
     #[test]
-    fn tree_deserialization_result_contains_all_the_strings_of_the_filesystem() {
+    fn tree_serialization_result_contains_all_the_strings_of_the_filesystem() {
         let mut result = String::new();
-        let path = PathBuf::from("./tests/tree_deserialization/root");
+        let path = PathBuf::from("./tests/tree_serialization/root");
 
-        tree_deserialization(&path, &mut result);
+        tree_serialization(&path, &mut result);
 
         assert!(result.contains("root{"));
         assert!(result.contains("dir_1{"));
