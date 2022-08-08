@@ -34,7 +34,7 @@ impl Parser {
         
         let readed_bytes = read_bytes(socket, &mut input_bytes).await;
         let readed_bytes = if readed_bytes.is_none() { return false } else { readed_bytes.unwrap() };
-        println!("readed bytes {}", readed_bytes); // log
+        println!("{}: readed bytes {}", socket.peer_addr().unwrap(), readed_bytes); // log
 
         let total_len = input_bytes.len();
         let mut acc_len: usize = 4;

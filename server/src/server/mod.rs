@@ -11,12 +11,12 @@ use tokio::{net::TcpStream, io::AsyncReadExt};
 async fn read_bytes(socket: &mut TcpStream, buf: &mut Vec<u8>) -> Option<usize> {
     match (*socket).read(&mut buf[..]).await {
         Ok(n) if n <= 0 => {
-            println!("Read 0 bytes");
+            println!("{}: Read 0 bytes", socket.peer_addr().unwrap(),);
             return None;
         },
         Ok(n) => return Some(n),
         Err(e) => {
-            println!("{}", e);
+            println!("{}: {}", socket.peer_addr().unwrap(), e);
             return None;
         }
     }

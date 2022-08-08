@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tokio::net::TcpStream;
 
 /// Trait to represent all the versions of the nFTP protocol. 
-pub trait Version {
+pub trait Version: Sync + Send  {
 
     /// Continue the parsing of a specific version of the protocol.
     fn parse(&self,
@@ -25,8 +25,10 @@ pub trait Version {
 
 /// Trait to represent all the istructions and their actions.
 #[async_trait]
-pub trait Istruction {
+pub trait Istruction: Sync + Send  {
+    /// Execute the istruction
     async fn execute(&self, socket: &mut TcpStream, bytes: &Vec<u8>, main_path: &PathBuf) -> bool;
 
+    /// Return the istruction code
     fn get_istruction_code(&self) -> u8;
 }

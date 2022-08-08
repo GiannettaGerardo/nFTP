@@ -4,6 +4,9 @@ use tokio::{net::TcpStream, io::AsyncWriteExt, time::{Instant, sleep_until}};
 /// Response code OK
 pub const RC_OK: u8 = 1;
 
+/// Response code GENERIC ERROR
+pub const RC_ERROR: u8 = 100;
+
 /// Represents a response header for the nFTP protocol.
 pub struct ResponseHeader {
     header_bytes: Vec<u8>

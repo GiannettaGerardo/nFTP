@@ -63,14 +63,14 @@ impl Istruction for Get {
     #[inline]
     async fn execute(&self, socket: &mut TcpStream, _: &Vec<u8>, main_path: &PathBuf) -> bool {
         if self.paths.len() != 1 {
-            println!("Too many paths for GET request");
+            println!("{}: Too many paths for GET request", socket.peer_addr().unwrap());
             return false;
         }
 
         let complete_path = main_path.join(&self.paths[0]);
         // first syscall - check the existence of the path and if the path is a file
         if !complete_path.is_file() {
-            println!("A path doesn't exists for GET request");
+            println!("{}: A path doesn't exists for GET request", socket.peer_addr().unwrap());
             return false;
         }
         
@@ -78,7 +78,7 @@ impl Istruction for Get {
         let payload_dim = match complete_path.metadata() {
             Ok(n) => n.len(),
             Err(e) => {
-                println!("{}", e);
+                println!("{}: {}", socket.peer_addr().unwrap(), e);
                 return false;
             }
         };
@@ -88,11 +88,11 @@ impl Istruction for Get {
         match socket.write_all(&response_header.get_header()).await {
             // third syscall - read the file in bytes
             Ok(_) => if let Err(e) = socket.write_all(&std::fs::read(complete_path).unwrap()).await {
-                println!("{}", e);
+                println!("{}: {}", socket.peer_addr().unwrap(), e);
                 return false;
             },
             Err(e) => {
-                println!("Header writing problem occurs: {}", e);
+                println!("{}: Header writing problem occurs: {}", socket.peer_addr().unwrap(), e);
                 return false;
             }
         };
@@ -118,11 +118,11 @@ impl Istruction for List {
         
         match socket.write_all(&response_header.get_header()).await {
             Ok(_) => if let Err(e) = socket.write_all(list.as_bytes()).await {
-                println!("{}", e);
+                println!("{}: {}", socket.peer_addr().unwrap(), e);
                 return false;
             },
             Err(e) => {
-                println!("Header writing problem occurs: {}", e);
+                println!("{}: Header writing problem occurs: {}", socket.peer_addr().unwrap(), e);
                 return false;
             }
         };
