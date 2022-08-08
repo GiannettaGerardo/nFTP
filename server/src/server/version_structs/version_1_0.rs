@@ -10,11 +10,10 @@ use crate::server::{
         istruction_recognition, 
         path_recognition
     }, 
-    MAIN_PATH, 
     response::{
         ResponseHeader, 
         RC_OK
-    }
+    }, tree_serialization
 };
 
 pub struct Version1_0;
@@ -35,8 +34,8 @@ impl Version for Version1_0 {
 
         match istruction {
             0 => return Some(Box::new(Get {paths})),
-            // 1 => return Ok(Box::new(Insert)),
-            // 2 => return Ok(Box::new(List)),
+            1 => return Some(Box::new(List)),
+            // 2 => return Some(Box::new(Insert)),
 
             _ => {
                 println!("Bad Istruction");
@@ -62,9 +61,7 @@ impl Istruction for Get {
     /// For the GET request, execute() checks if the path exists and if it is a file,
     /// then creates a response header, writes it and the file into the socket.
     #[inline]
-    async fn execute(&self, socket: &mut TcpStream, _: &Vec<u8>) -> bool {
-        let main_path = PathBuf::from(MAIN_PATH);
-
+    async fn execute(&self, socket: &mut TcpStream, _: &Vec<u8>, main_path: &PathBuf) -> bool {
         if self.paths.len() != 1 {
             println!("Too many paths for GET request");
             return false;
@@ -94,8 +91,8 @@ impl Istruction for Get {
                 println!("{}", e);
                 return false;
             },
-            Err(_) => {
-                println!("Header writing problem occurs");
+            Err(e) => {
+                println!("Header writing problem occurs: {}", e);
                 return false;
             }
         };
@@ -105,6 +102,36 @@ impl Istruction for Get {
     #[inline]
     fn get_istruction_code(&self) -> u8 {
         0u8
+    }
+}
+
+
+pub struct List;
+#[async_trait]
+impl Istruction for List {
+    #[inline]
+    async fn execute(&self, socket: &mut TcpStream, _: &Vec<u8>, main_path: &PathBuf) -> bool {
+        let mut list = String::with_capacity(1000);
+        tree_serialization(main_path, &mut list);
+
+        let response_header = ResponseHeader::new(1, 0, RC_OK, Some(list.len() as u64));
+        
+        match socket.write_all(&response_header.get_header()).await {
+            Ok(_) => if let Err(e) = socket.write_all(list.as_bytes()).await {
+                println!("{}", e);
+                return false;
+            },
+            Err(e) => {
+                println!("Header writing problem occurs: {}", e);
+                return false;
+            }
+        };
+        true
+    }
+
+    #[inline]
+    fn get_istruction_code(&self) -> u8 {
+        1u8
     }
 }
 
@@ -123,7 +150,7 @@ pub mod test {
         let mut index: usize = 0;
         let get_code = 0u8;
         
-        input_bytes.push(0u8); // GET
+        input_bytes.push(get_code);
         input_bytes.push(2u8); // 2 paths
         
         input_bytes.extend_from_slice(&(path1.len() as u16).to_be_bytes());
@@ -135,6 +162,21 @@ pub mod test {
         let res = Version1_0.parse(&input_bytes, &input_bytes.len(), &mut acc_len, &mut index);
         assert!(res.is_some());
         assert_eq!(get_code, res.unwrap().get_istruction_code());
+    }
+
+    #[test]
+    fn parse_should_return_list() {
+        let mut input_bytes: Vec<u8> = Vec::new();
+        let mut acc_len: usize = 0;
+        let mut index: usize = 0;
+        let list_code = 1u8;
+        
+        input_bytes.push(list_code);
+        input_bytes.push(0u8); // 0 paths
+
+        let res = Version1_0.parse(&input_bytes, &input_bytes.len(), &mut acc_len, &mut index);
+        assert!(res.is_some());
+        assert_eq!(list_code, res.unwrap().get_istruction_code());
     }
 
     #[test]

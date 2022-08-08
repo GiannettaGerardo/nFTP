@@ -4,11 +4,7 @@ pub mod version_structs;
 pub mod response;
 
 use std::path::PathBuf;
-
 use tokio::{net::TcpStream, io::AsyncReadExt};
-
-// test
-pub static MAIN_PATH: &str = "/home/gg/Scrivania/rust";
 
 /// Read bytes from the socket and return the number of bytes readed.
 #[inline]
@@ -78,7 +74,6 @@ pub fn tree_serialization(path: &PathBuf, result: &mut String) {
 #[cfg(test)]
 pub mod test {
     use std::path::PathBuf;
-
     use super::tree_serialization;
 
     #[test]

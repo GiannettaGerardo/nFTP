@@ -11,31 +11,47 @@ const MAX_PATHS: u8 = 10;
 /// Max dimension of the header buffer
 const MAX_HEADER_BUF: usize = 1024;
 
+pub struct Parser {
+    main_path: PathBuf
+}
+impl Parser {
+    /// Create a parser struct. Opens the config.txt file and extracts the main path from it.
+    pub fn new() -> Self {
+        let main_path = PathBuf::from(
+            std::fs::read_to_string("./config.txt").expect("Read error in config.txt file")
+        );
+        println!("The MAIN PATH: {}", main_path.display());
+        if !main_path.exists() || !main_path.is_absolute() {
+            panic!("The path read from config.txt file does not exists or isn't absolute");
+        }
+        Parser { main_path }
+    }
 
-/// Parse the input bytes according to nFTP protocol.
-#[inline]
-pub async fn process_request(socket: &mut TcpStream) -> bool {
-    let mut input_bytes: Vec<u8> = vec![0; MAX_HEADER_BUF];
-    
-    let readed_bytes = read_bytes(socket, &mut input_bytes).await;
-    let readed_bytes = if readed_bytes.is_none() { return false } else { readed_bytes.unwrap() };
-    println!("readed bytes {}", readed_bytes); // log
+    /// Parse the input bytes according to nFTP protocol.
+    #[inline]
+    pub async fn process_request(&self, socket: &mut TcpStream) -> bool {
+        let mut input_bytes: Vec<u8> = vec![0; MAX_HEADER_BUF];
+        
+        let readed_bytes = read_bytes(socket, &mut input_bytes).await;
+        let readed_bytes = if readed_bytes.is_none() { return false } else { readed_bytes.unwrap() };
+        println!("readed bytes {}", readed_bytes); // log
 
-    let total_len = input_bytes.len();
-    let mut acc_len: usize = 4;
-    let mut index: usize = 0;
-    
-    if !protocol_recognition(&input_bytes, &total_len, &mut acc_len, &mut index) { return false }
+        let total_len = input_bytes.len();
+        let mut acc_len: usize = 4;
+        let mut index: usize = 0;
+        
+        if !protocol_recognition(&input_bytes, &total_len, &mut acc_len, &mut index) { return false }
 
-    let version = version_recognition(&input_bytes, &total_len, &mut acc_len, &mut index);
-    let version = if version.is_none() { return false } else { version.unwrap() };
+        let version = version_recognition(&input_bytes, &total_len, &mut acc_len, &mut index);
+        let version = if version.is_none() { return false } else { version.unwrap() };
 
-    let istruction = version.parse(&input_bytes, &total_len, &mut acc_len, &mut index);
-    let istruction = if istruction.is_none() { return false } else { istruction.unwrap() };
+        let istruction = version.parse(&input_bytes, &total_len, &mut acc_len, &mut index);
+        let istruction = if istruction.is_none() { return false } else { istruction.unwrap() };
 
-    if !istruction.execute(socket, &input_bytes).await { return false }
-    
-    true
+        if !istruction.execute(socket, &input_bytes, &self.main_path).await { return false }
+        
+        true
+    }
 }
 
 
@@ -148,14 +164,14 @@ pub fn path_recognition(
 {
     *index = *acc_len;
     *acc_len += 1;
-    if total_len <= acc_len {
+    if total_len < acc_len {
         println!("n_paths error");
         return None;
     }
     
     let n_paths = input_bytes[*index];
-    if n_paths < 1 && n_paths > MAX_PATHS {
-        println!("error, n_paths is {}", n_paths);
+    if n_paths > MAX_PATHS {
+        println!("error, n_paths is {} but should be {}", n_paths, MAX_PATHS);
         return None;
     }
 
@@ -313,6 +329,19 @@ pub mod test {
 
             let paths = path_recognition(&input_bytes, &total_len, &mut acc_len, &mut index);
             assert!(paths.is_some());
+        }
+
+        #[test]
+        fn path_recognition_no_paths_should_return_empty_vector() {
+            let n_path: u8 = 0;
+            let input_bytes: Vec<u8> = vec![n_path];
+
+            let total_len = input_bytes.len();
+            let mut acc_len = 0;
+            let mut index = 0;
+
+            let paths = path_recognition(&input_bytes, &total_len, &mut acc_len, &mut index);
+            assert_eq!(paths, Some(vec![]));
         }
     }
 }

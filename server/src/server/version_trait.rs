@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use async_trait::async_trait;
 use tokio::net::TcpStream;
 
@@ -24,7 +26,7 @@ pub trait Version {
 /// Trait to represent all the istructions and their actions.
 #[async_trait]
 pub trait Istruction {
-    async fn execute(&self, socket: &mut TcpStream, bytes: &Vec<u8>) -> bool;
+    async fn execute(&self, socket: &mut TcpStream, bytes: &Vec<u8>, main_path: &PathBuf) -> bool;
 
     fn get_istruction_code(&self) -> u8;
 }
